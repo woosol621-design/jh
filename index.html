@@ -1,68 +1,121 @@
-   <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>듀핫 클릭커 게임</title>
+    <title>파미리 폭파</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
-        @keyframes pulse-animation {
-            0% { transform: scale(1); }
-            50% { transform: scale(0.9); }
-            100% { transform: scale(1); }
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            40% { transform: translate(3px, 2px) rotate(0deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            80% { transform: translate(3px, 1px) rotate(-1deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
         }
-        .heart-beat {
-            animation: pulse-animation 0.5s ease-in-out;
-        }
-        .float-animation {
-            animation: float 3s ease-in-out infinite;
-        }
-        @keyframes float {
-            0% { transform: translateY(0px); }
-            50% { transform: translateY(-20px); }
-            100% { transform: translateY(0px); }
-        }
+        .shaking { animation: shake 0.3s infinite; }
+        .glitch-text { text-shadow: 2px 0 red, -2px 0 blue; }
+        #console-log { font-family: 'Courier New', monospace; }
     </style>
 </head>
-<body class="bg-rose-50 min-h-screen flex flex-col items-center justify-center p-4 font-sans text-rose-900">
+<body class="bg-black text-white min-h-screen flex items-center justify-center p-4">
 
-    <div class="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-sm text-center border-4 border-rose-200">
-        <h1 class="text-3xl font-bold mb-2">듀핫 클릭커</h1>
-        <p class="text-rose-500 mb-6 font-medium">하트를 눌러 사랑을 채워주세요!</p>
-
-        <div class="my-8">
-            <span class="text-6xl font-extrabold text-rose-600" id="loveCount">0</span>
-            <p class="text-sm uppercase tracking-widest text-rose-400 mt-2">사랑지수</p>
+    <div id="app" class="w-full max-w-md bg-[#16181c] border border-gray-800 rounded-2xl overflow-hidden shadow-2xl">
+        
+        <div class="p-4 border-b border-gray-800 flex justify-between items-center">
+            <h1 class="text-xl font-bold italic text-yellow-400">파미리 폭파</h1>
+            <button id="destroy-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full transition-all">
+                폭파 실행
+            </button>
+            <button id="reset-btn" class="hidden bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full transition-all">
+                다시 터트리기
+            </button>
         </div>
 
-        <button id="heartBtn" class="focus:outline-none transition-transform duration-100 ease-out active:scale-95">
-            <svg class="w-48 h-48 mx-auto float-animation text-rose-500 hover:text-rose-400" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-            </svg>
-        </button>
-        
-        <p class="mt-8 text-xs text-rose-300">© 2026 DewHeart Studio</p>
+        <div id="profile-container" class="p-6">
+            <!-- 기본 프사 -->
+            <div class="w-24 h-24 bg-gray-600 rounded-full mb-4 flex items-center justify-center text-4xl">👤</div>
+            <h2 class="text-2xl font-extrabold text-white">파미리</h2>
+            <p class="text-gray-400 mb-4">@pamiri_official</p>
+            <p class="text-gray-300">이 계정은 곧 '펑'하고 사라집니다. 준비되셨나요?</p>
+        </div>
+
+        <div id="console-log" class="p-4 bg-black text-green-400 text-sm h-32 overflow-y-auto border-t border-gray-800">
+            <div>시스템 대기 중...</div>
+        </div>
     </div>
 
     <script>
-        let loveIndex = 0;
-        const countDisplay = document.getElementById('loveCount');
-        const heartBtn = document.getElementById('heartBtn');
+        const destroyBtn = document.getElementById('destroy-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const consoleLog = document.getElementById('console-log');
+        const profileContainer = document.getElementById('profile-container');
+        const app = document.getElementById('app');
 
-        heartBtn.addEventListener('click', () => {
-            // 사랑지수 증가
-            loveIndex++;
-            countDisplay.innerText = loveIndex;
+        const originalProfileHTML = profileContainer.innerHTML;
 
-            // 클릭 애니메이션 효과
-            heartBtn.classList.add('heart-beat');
-            setTimeout(() => {
-                heartBtn.classList.remove('heart-beat');
-            }, 500);
+        // "펑" 소리를 위한 합성기 (MembraneSynth + Noise 조합)
+        const bangSynth = new Tone.MembraneSynth({
+            pitchDecay: 0.05,
+            octaves: 10,
+            oscillator: { type: "sine" },
+            envelope: { attack: 0.001, decay: 0.4, sustain: 0, release: 0.2 }
+        }).toDestination();
 
-            // 콘솔 메시지 (선택적)
-            console.log(`현재 사랑지수: ${loveIndex}`);
-        });
+        const noise = new Tone.NoiseSynth({
+            noise: { type: "white" },
+            envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.1 }
+        }).toDestination();
+
+        function log(message) {
+            const div = document.createElement('div');
+            div.textContent = `> ${message}`;
+            consoleLog.appendChild(div);
+            consoleLog.scrollTop = consoleLog.scrollHeight;
+        }
+
+        async function triggerDestruction() {
+            await Tone.start();
+            destroyBtn.classList.add('hidden');
+            
+            const steps = [
+                "접속 시도 중...",
+                "보안 뚫는 중...",
+                "파미리 데이터 타겟팅...",
+                "3...", "2...", "1...",
+                "펑!!!"
+            ];
+
+            for (let i = 0; i < steps.length; i++) {
+                setTimeout(() => {
+                    log(steps[i]);
+                    
+                    if(i === steps.length - 1) {
+                        app.classList.add('shaking');
+                        bangSynth.triggerAttackRelease("C2", "8n");
+                        noise.triggerAttackRelease("8n");
+                        
+                        setTimeout(() => {
+                            app.classList.remove('shaking');
+                            profileContainer.innerHTML = '<div class="text-center py-10"><h2 class="text-6xl mb-4">💥</h2><p class="text-xl font-bold">계정이 펑 터졌습니다!</p></div>';
+                            resetBtn.classList.remove('hidden');
+                        }, 500);
+                    }
+                }, i * 800);
+            }
+        }
+
+        function resetGame() {
+            profileContainer.innerHTML = originalProfileHTML;
+            resetBtn.classList.add('hidden');
+            destroyBtn.classList.remove('hidden');
+            consoleLog.innerHTML = '<div>시스템 복구 완료. 대기 중...</div>';
+        }
+
+        destroyBtn.addEventListener('click', triggerDestruction);
+        resetBtn.addEventListener('click', resetGame);
     </script>
 </body>
 </html>
